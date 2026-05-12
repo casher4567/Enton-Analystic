@@ -34,15 +34,19 @@ jobs:
         env:
           GUARDRAIL_ALERT_WEBHOOK_URL: ${{ secrets.GUARDRAIL_ALERT_WEBHOOK_URL }}
         run: |
-          node notify_guardrail_failure_v1.js || true
           BLOCK_REASON="$(grep -m1 'PUBLISH BLOCKED:' guardrail.log || echo 'PUBLISH BLOCKED: unknown reason (check logs)')"
-          echo "$BLOCK_REASON"
+          MSG="[P1] A3 QA Gate Hard Fail in ${GITHUB_REPOSITORY} (${GITHUB_REF_NAME}) - ${BLOCK_REASON} - https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data "{\"text\":\"${MSG}\"}" \
+            "$GUARDRAIL_ALERT_WEBHOOK_URL"
+
           {
             echo "## A3 QA Gate Hard Fail"
             echo "- Severity: P1"
             echo "- Guardrail blocked publish."
             echo "- Reason: ${BLOCK_REASON}"
-            echo "- Alert webhook configured: $([ -n \"${GUARDRAIL_ALERT_WEBHOOK_URL}\" ] && echo yes || echo no)"
             echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
