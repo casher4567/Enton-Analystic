@@ -1,0 +1,48 @@
+name: Publish Guardrail
+
+on:
+  workflow_dispatch:
+    inputs:
+      qa_gate_result_path:
+        description: Path to qa_gate_result_v1.json in this checkout
+        required: false
+        default: artifacts/qa_gate_result_v1.json
+
+jobs:
+  publish-guardrail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enforce QA gate before publish
+        id: guardrail
+        continue-on-error: true
+        env:
+          QA_GATE_RESULT_PATH: ${{ github.event.inputs.qa_gate_result_path }}
+        run: node publish_guardrail_v1.js
+
+      - name: Route A3 alert on guardrail failure
+        if: ${{ steps.guardrail.outcome == 'failure' }}
+        env:
+          GUARDRAIL_ALERT_WEBHOOK_URL: ${{ secrets.GUARDRAIL_ALERT_WEBHOOK_URL }}
+        run: |
+          node notify_guardrail_failure_v1.js || true
+          {
+            echo "## A3 QA Gate Hard Fail"
+            echo "- Severity: P1"
+            echo "- Guardrail blocked publish."
+            echo "- Alert webhook configured: $([ -n \"${GUARDRAIL_ALERT_WEBHOOK_URL}\" ] && echo yes || echo no)"
+            echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail workflow when guardrail fails
+        if: ${{ steps.guardrail.outcome == 'failure' }}
+        run: |
+          echo "Publish remains blocked due to QA gate failure."
+          exit 1
