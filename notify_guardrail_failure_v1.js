@@ -16,6 +16,7 @@ function postJson(urlValue, payload) {
   return new Promise((resolve, reject) => {
     const target = new URL(urlValue);
     const body = JSON.stringify(payload);
+
     const req = https.request(
       {
         protocol: target.protocol,
@@ -50,24 +51,12 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const webhookUrl = process.env.GUARDRAIL_ALERT_WEBHOOK_URL || "";
   const repo = process.env.GITHUB_REPOSITORY || "unknown-repo";
+  const ref = process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || "unknown-ref";
   const runId = process.env.GITHUB_RUN_ID || "unknown-run";
   const runUrl = `https://github.com/${repo}/actions/runs/${runId}`;
-  const ref = process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || "unknown-ref";
-  const actor = process.env.GITHUB_ACTOR || "unknown-actor";
-  const sha = process.env.GITHUB_SHA || "unknown-sha";
 
   const payload = {
-    text: `[P1] A3 QA Gate Hard Fail in ${repo} (${ref})`,
-    alert_class: "A3 QA Gate Hard Fail",
-    severity: "P1",
-    message: "Publish guardrail blocked publish because QA gate did not pass.",
-    source: "publish_guardrail_v1",
-    repository: repo,
-    ref,
-    actor,
-    sha,
-    run_url: runUrl,
-    generated_at_utc: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    text: `[P1] A3 QA Gate Hard Fail in ${repo} (${ref}) - ${runUrl}`
   };
 
   if (args.dryRun) {
@@ -81,6 +70,7 @@ async function main() {
   }
 
   const response = await postJson(webhookUrl, payload);
+
   if (response.statusCode < 200 || response.statusCode >= 300) {
     console.error(`Alert delivery failed with status ${response.statusCode}`);
     if (response.body) console.error(response.body.slice(0, 500));
