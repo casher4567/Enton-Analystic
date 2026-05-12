@@ -25,7 +25,9 @@ jobs:
         continue-on-error: true
         env:
           QA_GATE_RESULT_PATH: ${{ github.event.inputs.qa_gate_result_path }}
-        run: node publish_guardrail_v1.js
+        run: |
+          set -o pipefail
+          node publish_guardrail_v1.js 2>&1 | tee guardrail.log
 
       - name: Route A3 alert on guardrail failure
         if: ${{ steps.guardrail.outcome == 'failure' }}
@@ -33,10 +35,13 @@ jobs:
           GUARDRAIL_ALERT_WEBHOOK_URL: ${{ secrets.GUARDRAIL_ALERT_WEBHOOK_URL }}
         run: |
           node notify_guardrail_failure_v1.js || true
+          BLOCK_REASON="$(grep -m1 'PUBLISH BLOCKED:' guardrail.log || echo 'PUBLISH BLOCKED: unknown reason (check logs)')"
+          echo "$BLOCK_REASON"
           {
             echo "## A3 QA Gate Hard Fail"
             echo "- Severity: P1"
             echo "- Guardrail blocked publish."
+            echo "- Reason: ${BLOCK_REASON}"
             echo "- Alert webhook configured: $([ -n \"${GUARDRAIL_ALERT_WEBHOOK_URL}\" ] && echo yes || echo no)"
             echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
