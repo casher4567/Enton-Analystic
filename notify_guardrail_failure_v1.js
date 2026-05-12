@@ -57,6 +57,7 @@ async function main() {
   const sha = process.env.GITHUB_SHA || "unknown-sha";
 
   const payload = {
+    text: `[P1] A3 QA Gate Hard Fail in ${repo} (${ref})`,
     alert_class: "A3 QA Gate Hard Fail",
     severity: "P1",
     message: "Publish guardrail blocked publish because QA gate did not pass.",
